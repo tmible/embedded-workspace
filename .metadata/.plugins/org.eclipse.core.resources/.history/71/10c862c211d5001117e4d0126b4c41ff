@@ -1,0 +1,13 @@
+/*
+ * ssd1315.h
+ *
+ *  Created on: 31 окт. 2026 г.
+ *      Author: nikita
+ */
+
+#ifndef INC_SSD1315_H_
+#define INC_SSD1315_H_
+
+
+
+#endif /* INC_SSD1315_H_ */

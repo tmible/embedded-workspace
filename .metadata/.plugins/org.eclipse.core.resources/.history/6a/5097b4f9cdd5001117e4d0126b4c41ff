@@ -1,0 +1,11 @@
+#ifndef INC_ROGER_H_
+#define INC_ROGER_H_
+
+#include "stm32f4xx_hal.h"
+#include "circular_buffer.h"
+
+typedef void (*UartCallback_t)(uint8_t length);
+
+void Roger_Init(USART_TypeDef* instanceInit, UART_HandleTypeDef* huartInit, size_t bufferSize, UartCallback_t callbackInit);
+
+#endif /* INC_ROGER_H_ */

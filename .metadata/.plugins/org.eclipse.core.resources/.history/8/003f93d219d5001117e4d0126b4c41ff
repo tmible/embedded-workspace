@@ -1,0 +1,19 @@
+#include "roger.h"
+
+typedef struct CircularBuffer {
+	uint8_t buffer[225];
+	size_t start;
+	size_t current;
+} CircularBuffer;
+
+static UART_HandleTypeDef* huart;
+
+static uint8_t rx_buffer[1];
+static CircularBuffer message = { .start = 0, .current = 0 };
+
+static const char answer[] = "roger\r\n";
+
+void Roger_Init(UART_HandleTypeDef* huartInit) {
+	huart = huartInit;
+	HAL_UARTEx_ReceiveToIdle_DMA(huart, rx_buffer, sizeof(rx_buffer));
+}

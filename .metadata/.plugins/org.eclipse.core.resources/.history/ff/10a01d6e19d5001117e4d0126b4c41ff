@@ -1,0 +1,12 @@
+#include "roger.h"
+
+typedef struct CircularBuffer {
+	uint8_t buffer[225];
+	size_t start;
+	size_t current;
+} CircularBuffer;
+
+uint8_t rx_buffer[1];
+CircularBuffer message = { .start = 0, .current = 0 };
+
+const char answer[] = "roger\r\n";

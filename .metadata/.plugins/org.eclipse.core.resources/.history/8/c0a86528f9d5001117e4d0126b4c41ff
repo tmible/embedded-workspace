@@ -1,0 +1,155 @@
+#include "ssd1315.h"
+
+#define MAX_ROWS (int)(SCREEN_HEIGHT / FONT_HEIGHT)
+#define MAX_COLS (int)(SCREEN_WIDTH / FONT_WIDTH)
+
+typedef enum {
+	SSD1315_Idle,
+	SSD1315_WriteCommands,
+	SSD1315_WritePixels,
+} SSD1315_State_t;
+
+static const uint8_t ssd1315_setScreenCommands[6] = {
+	0x21,
+	0x00,
+	SCREEN_WIDTH - 1,
+    0x22,
+	0x00,
+	(SCREEN_HEIGHT / BITS_IN_BYTE) - 1,
+};
+
+static I2C_HandleTypeDef* hi2c;
+
+static SSD1315_State_t ssd1315_state = SSD1315_Idle;
+
+static uint8_t screen_buffer[BUFFER_SIZE];
+
+static uint8_t cursor_x;
+static uint8_t cursor_y;
+
+// Отправка одной управляющей команды
+void SSD1315_WriteCommand(uint8_t cmd) {
+    HAL_I2C_Mem_Write(hi2c, SSD1315_I2C_ADDR, 0x00, I2C_MEMADD_SIZE_8BIT, &cmd, 1, HAL_MAX_DELAY);
+}
+
+void SSD1315_Init(I2C_HandleTypeDef* hi2cInit) {
+	hi2c = hi2cInit;
+
+    HAL_Delay(100); // Ждем стабилизации питания дисплея
+
+    SSD1315_WriteCommand(0xAE); // Выключить дисплей (Sleep mode)
+
+    SSD1315_WriteCommand(0x20); // Настройка адресации памяти
+    SSD1315_WriteCommand(0x00); // 0x00 — Горизонтальная адресация (автоинкремент)
+
+    SSD1315_WriteCommand(0xB0); // Установка стартового адреса страницы (0)
+
+    SSD1315_WriteCommand(0xC8); // Переворот выходов COM (сканирование снизу вверх)
+    SSD1315_WriteCommand(0x00); // Установка низшего адреса колонки
+    SSD1315_WriteCommand(0x10); // Установка высшего адреса колонки
+    SSD1315_WriteCommand(0x40); // Установка стартовой строки (0)
+
+    SSD1315_WriteCommand(0x81); // Контрастность
+    SSD1315_WriteCommand(0xCF); // Значение яркости от 0x00 до 0xFF
+
+    SSD1315_WriteCommand(0xA1); // Переворот сегментов (разворот экрана по горизонтали)
+    SSD1315_WriteCommand(0xA6); // Обычный режим (0xA7 — инверсный)
+
+    SSD1315_WriteCommand(0xA8); // Мультиплексор (высота экрана)
+    SSD1315_WriteCommand(0x3F); // 63 (для разрешения 128x64)
+
+    SSD1315_WriteCommand(0xA4); // Вывод данных из RAM (0xA5 — включить все пиксели)
+    SSD1315_WriteCommand(0xD3); // Смещение дисплея
+    SSD1315_WriteCommand(0x00); // Без смещения
+
+    SSD1315_WriteCommand(0xD5); // Частота генератора дисплея
+    SSD1315_WriteCommand(0x80); // Рекомендуемое значение
+
+    SSD1315_WriteCommand(0xD9); // Период предзаряда фаз
+    SSD1315_WriteCommand(0xF1); // Рекомендуемое значение для SSD1315/SSD1306
+
+    SSD1315_WriteCommand(0xDA); // Конфигурация пинов COM
+    SSD1315_WriteCommand(0x12); // Альтернативная конфигурация (для 128x64)
+
+    SSD1315_WriteCommand(0xDB); // Уровень VCOMH
+    SSD1315_WriteCommand(0x40);
+
+    SSD1315_WriteCommand(0x8D); // Управление встроенным насосом накачки (Charge Pump)
+    SSD1315_WriteCommand(0x14); // 0x14 — Включить (без этого экран будет черным)
+
+    SSD1315_WriteCommand(0xAF); // Включить дисплей (Display ON)
+}
+
+void SSD1315_ClearScreen(void) {
+	for (size_t i = 0; i < BUFFER_SIZE; ++i) {
+		screen_buffer[i] = 0x00;
+	}
+
+	cursor_x = 0;
+	cursor_y = 0;
+}
+
+// Отправка всего буфера кадра на дисплей
+void SSD1315_UpdateScreen(void) {
+    HAL_I2C_MemTxCpltCallback(hi2c);
+}
+
+__weak void SSD1315_UpdateScreenCompleteCallback(void) {}
+
+void HAL_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2cCallback) {
+	if (hi2cCallback->Instance != hi2c->Instance) {
+		return;
+	}
+
+	switch (ssd1315_state) {
+		case SSD1315_Idle:
+			HAL_I2C_Mem_Write_DMA(hi2c, SSD1315_I2C_ADDR, 0x00, I2C_MEMADD_SIZE_8BIT, (uint8_t*)ssd1315_setScreenCommands, sizeof(ssd1315_setScreenCommands));
+			ssd1315_state = SSD1315_WriteCommands;
+			break;
+		case SSD1315_WriteCommands:
+			HAL_I2C_Mem_Write_DMA(hi2c, SSD1315_I2C_ADDR, 0x40, I2C_MEMADD_SIZE_8BIT, screen_buffer, BUFFER_SIZE);
+			ssd1315_state = SSD1315_WritePixels;
+			break;
+		case SSD1315_WritePixels:
+			HAL_Delay(1000);
+			SSD1315_UpdateScreenCompleteCallback();
+			ssd1315_state = SSD1315_Idle;
+			break;
+		default:
+			break;
+	}
+}
+
+void SSD1315_DrawPixel(uint8_t x, uint8_t y, uint8_t color) {
+    if (x >= SCREEN_WIDTH || y >= SCREEN_HEIGHT) {
+    	return;
+    }
+
+    if (color) {
+    	screen_buffer[x + (y / 8) * 128] |= (1 << (y % 8));  // Зажечь пиксель
+    } else {
+    	screen_buffer[x + (y / 8) * 128] &= ~(1 << (y % 8)); // Погасить пиксель
+    }
+}
+
+void SSD1315_DrawChar(char c) {
+	if (c < ' ' || c > '~') {
+		return;
+	}
+
+	if (cursor_y >= MAX_ROWS * FONT_HEIGHT) {
+		return;
+	}
+
+	for (size_t i = 0; i < FONT_WIDTH; ++i) {
+		uint8_t byte = font5x7[((c - 32) * FONT_WIDTH) + i];
+		for (size_t j = 0; j < FONT_HEIGHT; ++j) {
+			if (byte & (1 << j)) {
+				SSD1315_DrawPixel(cursor_x + i, cursor_y + j, 1);
+			}
+		}
+	}
+
+	cursor_x = cursor_x == (MAX_COLS - 1) * FONT_WIDTH ? 0 : cursor_x + FONT_WIDTH;
+	cursor_y += cursor_x == 0 ? FONT_HEIGHT : 0;
+}

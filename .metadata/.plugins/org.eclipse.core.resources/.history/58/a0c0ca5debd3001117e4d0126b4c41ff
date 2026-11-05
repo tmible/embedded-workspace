@@ -1,0 +1,499 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2026 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+
+/* USER CODE END Includes */
+
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+
+#define SSD1315_I2C_ADDR  (0x3C << 1)
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+DMA_HandleTypeDef hdma_i2c1_tx;
+
+UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart1_tx;
+
+/* USER CODE BEGIN PV */
+
+// Доступ к символу c: &font5x7[(c - 0x20) * 5]
+static const uint8_t font5x7[] = {
+    0x00,0x00,0x00,0x00,0x00,  // ' ' (space)
+    0x00,0x00,0x5F,0x00,0x00,  // '!'
+    0x00,0x07,0x00,0x07,0x00,  // '"'
+    0x14,0x7F,0x14,0x7F,0x14,  // '#'
+    0x24,0x2A,0x7F,0x2A,0x12,  // '$'
+    0x23,0x13,0x08,0x64,0x62,  // '%'
+    0x36,0x49,0x55,0x22,0x50,  // '&'
+    0x00,0x05,0x03,0x00,0x00,  // '\''
+    0x00,0x1C,0x22,0x41,0x00,  // '('
+    0x00,0x41,0x22,0x1C,0x00,  // ')'
+    0x08,0x2A,0x1C,0x2A,0x08,  // '*'
+    0x08,0x08,0x3E,0x08,0x08,  // '+'
+    0x00,0x50,0x30,0x00,0x00,  // ','
+    0x08,0x08,0x08,0x08,0x08,  // '-'
+    0x00,0x30,0x30,0x00,0x00,  // '.'
+    0x00,0x60,0x30,0x18,0x0C,  // '/'
+    0x3E,0x51,0x49,0x45,0x3E,  // '0'
+    0x00,0x42,0x7F,0x40,0x00,  // '1'
+    0x42,0x61,0x51,0x49,0x7F,  // '2'
+    0x21,0x41,0x45,0x7B,0x41,  // '3'
+    0x18,0x14,0x12,0x7F,0x10,  // '4'
+    0x27,0x45,0x45,0x45,0x39,  // '5'
+    0x3C,0x4A,0x49,0x49,0x31,  // '6'
+    0x01,0x71,0x09,0x05,0x03,  // '7'
+    0x36,0x49,0x49,0x49,0x36,  // '8'
+    0x06,0x49,0x49,0x29,0x1E,  // '9'
+    0x00,0x36,0x36,0x00,0x00,  // ':'
+    0x00,0x56,0x36,0x00,0x00,  // ';'
+    0x08,0x14,0x22,0x41,0x00,  // '<'
+    0x14,0x14,0x14,0x14,0x14,  // '='
+    0x00,0x41,0x22,0x14,0x08,  // '>'
+    0x02,0x01,0x51,0x09,0x06,  // '?'
+    0x32,0x49,0x79,0x41,0x3E,  // '@'
+    0x7E,0x11,0x11,0x11,0x7E,  // 'A'
+    0x7F,0x49,0x49,0x49,0x36,  // 'B'
+    0x3E,0x41,0x41,0x41,0x22,  // 'C'
+    0x7F,0x41,0x41,0x22,0x1C,  // 'D'
+    0x7F,0x49,0x49,0x49,0x41,  // 'E'
+    0x7F,0x09,0x09,0x01,0x01,  // 'F'
+    0x3E,0x41,0x41,0x51,0x32,  // 'G'
+    0x7F,0x08,0x08,0x08,0x7F,  // 'H'
+    0x00,0x41,0x7F,0x41,0x00,  // 'I'
+    0x20,0x40,0x41,0x3F,0x01,  // 'J'
+    0x7F,0x08,0x14,0x22,0x41,  // 'K'
+    0x7F,0x40,0x40,0x40,0x40,  // 'L'
+    0x7F,0x02,0x04,0x02,0x7F,  // 'M'
+    0x7F,0x04,0x08,0x10,0x7F,  // 'N'
+    0x3E,0x41,0x41,0x41,0x3E,  // 'O'
+    0x7F,0x09,0x09,0x09,0x06,  // 'P'
+    0x3E,0x41,0x51,0x21,0x5E,  // 'Q'
+    0x7F,0x09,0x19,0x29,0x46,  // 'R'
+    0x46,0x49,0x49,0x49,0x31,  // 'S'
+    0x01,0x01,0x7F,0x01,0x01,  // 'T'
+    0x3F,0x40,0x40,0x40,0x3F,  // 'U'
+    0x1F,0x20,0x40,0x20,0x1F,  // 'V'
+    0x3F,0x40,0x38,0x40,0x3F,  // 'W'
+    0x63,0x14,0x08,0x14,0x63,  // 'X'
+    0x07,0x08,0x70,0x08,0x07,  // 'Y'
+    0x61,0x51,0x49,0x45,0x43,  // 'Z'
+    0x00,0x7F,0x41,0x41,0x00,  // '['
+    0x04,0x02,0x01,0x02,0x04,  // '\'
+    0x00,0x41,0x41,0x7F,0x00,  // ']'
+    0x04,0x02,0x01,0x02,0x04,  // '^'
+    0x40,0x40,0x40,0x40,0x40,  // '_'
+    0x00,0x01,0x02,0x04,0x00,  // '`'
+    0x20,0x54,0x54,0x54,0x78,  // 'a'
+    0x7F,0x48,0x44,0x44,0x38,  // 'b'
+    0x38,0x44,0x44,0x44,0x20,  // 'c'
+    0x38,0x44,0x44,0x48,0x7F,  // 'd'
+    0x38,0x54,0x54,0x54,0x18,  // 'e'
+    0x08,0x7E,0x09,0x01,0x02,  // 'f'
+    0x0C,0x52,0x52,0x52,0x3E,  // 'g'
+    0x7F,0x08,0x04,0x04,0x78,  // 'h'
+    0x00,0x44,0x7D,0x40,0x00,  // 'i'
+    0x20,0x40,0x44,0x3D,0x00,  // 'j'
+    0x7F,0x10,0x28,0x44,0x00,  // 'k'
+    0x00,0x41,0x7F,0x40,0x00,  // 'l'
+    0x7C,0x04,0x18,0x04,0x78,  // 'm'
+    0x7C,0x08,0x04,0x04,0x78,  // 'n'
+    0x38,0x44,0x44,0x44,0x38,  // 'o'
+    0x7C,0x14,0x14,0x14,0x08,  // 'p'
+    0x08,0x14,0x14,0x18,0x7C,  // 'q'
+    0x7C,0x08,0x04,0x04,0x08,  // 'r'
+    0x48,0x54,0x54,0x54,0x20,  // 's'
+    0x04,0x3F,0x44,0x40,0x20,  // 't'
+    0x3C,0x40,0x40,0x20,0x7C,  // 'u'
+    0x1C,0x20,0x40,0x20,0x1C,  // 'v'
+    0x3C,0x40,0x30,0x40,0x3C,  // 'w'
+    0x44,0x28,0x10,0x28,0x44,  // 'x'
+    0x0C,0x50,0x50,0x50,0x3C,  // 'y'
+    0x44,0x64,0x54,0x4C,0x44,  // 'z'
+    0x08,0x36,0x41,0x22,0x1C,  // '{'
+    0x00,0x00,0x7F,0x00,0x00,  // '|'
+    0x1C,0x22,0x41,0x36,0x08,  // '}'
+    0x08,0x14,0x22,0x41,0x00   // '~'
+};
+
+uint8_t screen_buffer[1024];
+
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
+static void MX_I2C1_Init(void);
+static void MX_USART1_UART_Init(void);
+/* USER CODE BEGIN PFP */
+
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+
+// Отправка одной управляющей команды
+void SSD1315_WriteCommand(uint8_t cmd) {
+    HAL_I2C_Mem_Write(&hi2c1, SSD1315_I2C_ADDR, 0x00, I2C_MEMADD_SIZE_8BIT, &cmd, 1, HAL_MAX_DELAY);
+}
+
+// Отправка всего буфера кадра на дисплей
+void SSD1315_UpdateScreen(void) {
+    // Возвращаем указатель адреса дисплея в начало (столбец 0, страница 0)
+    SSD1315_WriteCommand(0x21); // Установка диапазона колонок
+    SSD1315_WriteCommand(0);    // Старт
+    SSD1315_WriteCommand(127);  // Конец
+
+    SSD1315_WriteCommand(0x22); // Установка диапазона страниц (строк)
+    SSD1315_WriteCommand(0);    // Старт
+    SSD1315_WriteCommand(7);    // Конец (7 * 8 = 56, то есть до 63 строки)
+
+    // Отправляем массив данных. Префикс 0x40 указывает, что это поток байт видеопамяти
+    HAL_I2C_Mem_Write(&hi2c1, SSD1315_I2C_ADDR, 0x40, I2C_MEMADD_SIZE_8BIT, screen_buffer, 1024, HAL_MAX_DELAY);
+}
+
+void SSD1315_Init(void) {
+    HAL_Delay(100); // Ждем стабилизации питания дисплея
+
+    SSD1315_WriteCommand(0xAE); // Выключить дисплей (Sleep mode)
+
+    SSD1315_WriteCommand(0x20); // Настройка адресации памяти
+    SSD1315_WriteCommand(0x00); // 0x00 — Горизонтальная адресация (автоинкремент)
+
+    SSD1315_WriteCommand(0xB0); // Установка стартового адреса страницы (0)
+
+    SSD1315_WriteCommand(0xC8); // Переворот выходов COM (сканирование снизу вверх)
+    SSD1315_WriteCommand(0x00); // Установка низшего адреса колонки
+    SSD1315_WriteCommand(0x10); // Установка высшего адреса колонки
+    SSD1315_WriteCommand(0x40); // Установка стартовой строки (0)
+
+    SSD1315_WriteCommand(0x81); // Контрастность
+    SSD1315_WriteCommand(0xCF); // Значение яркости от 0x00 до 0xFF
+
+    SSD1315_WriteCommand(0xA1); // Переворот сегментов (разворот экрана по горизонтали)
+    SSD1315_WriteCommand(0xA6); // Обычный режим (0xA7 — инверсный)
+
+    SSD1315_WriteCommand(0xA8); // Мультиплексор (высота экрана)
+    SSD1315_WriteCommand(0x3F); // 63 (для разрешения 128x64)
+
+    SSD1315_WriteCommand(0xA4); // Вывод данных из RAM (0xA5 — включить все пиксели)
+    SSD1315_WriteCommand(0xD3); // Смещение дисплея
+    SSD1315_WriteCommand(0x00); // Без смещения
+
+    SSD1315_WriteCommand(0xD5); // Частота генератора дисплея
+    SSD1315_WriteCommand(0x80); // Рекомендуемое значение
+
+    SSD1315_WriteCommand(0xD9); // Период предзаряда фаз
+    SSD1315_WriteCommand(0xF1); // Рекомендуемое значение для SSD1315/SSD1306
+
+    SSD1315_WriteCommand(0xDA); // Конфигурация пинов COM
+    SSD1315_WriteCommand(0x12); // Альтернативная конфигурация (для 128x64)
+
+    SSD1315_WriteCommand(0xDB); // Уровень VCOMH
+    SSD1315_WriteCommand(0x40);
+
+    SSD1315_WriteCommand(0x8D); // Управление встроенным насосом накачки (Charge Pump)
+    SSD1315_WriteCommand(0x14); // 0x14 — Включить (без этого экран будет черным)
+
+    SSD1315_WriteCommand(0xAF); // Включить дисплей (Display ON)
+}
+
+void SSD1315_DrawPixel(uint16_t x, uint16_t y, uint8_t color) {
+    if (x >= 128 || y >= 64) {
+    	return;
+    }
+
+    if (color) {
+        screen_buffer[x + (y / 8) * 128] |= (1 << (y % 8));  // Зажечь пиксель
+    } else {
+        screen_buffer[x + (y / 8) * 128] &= ~(1 << (y % 8)); // Погасить пиксель
+    }
+}
+
+void draw_char(int x, int y, char c) {
+    const uint8_t *g = &font5x7[(c - 0x20) * 5];
+    for (int row = 0; row < 5; row++) {
+        for (int col = 0; col < 5; col++) {
+            if (g[row] & (0x10 >> col))
+            	SSD1315_DrawPixel(x + col, y + row, 1);
+        }
+    }
+}
+
+/* USER CODE END 0 */
+
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_DMA_Init();
+  MX_I2C1_Init();
+  MX_USART1_UART_Init();
+  /* USER CODE BEGIN 2 */
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+  }
+  /* USER CODE END 3 */
+}
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_RCC_PWR_CLK_ENABLE();
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 25;
+  RCC_OscInitStruct.PLL.PLLN = 400;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 400000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA2_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+  /* DMA2_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+  /* DMA2_Stream7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
+
+}
+
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
+
+  /* USER CODE END MX_GPIO_Init_1 */
+
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+
+  /* USER CODE END MX_GPIO_Init_2 */
+}
+
+/* USER CODE BEGIN 4 */
+
+/* USER CODE END 4 */
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
+  /* USER CODE END Error_Handler_Debug */
+}
+#ifdef USE_FULL_ASSERT
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* USER CODE BEGIN 6 */
+  /* User can add his own implementation to report the file name and line number,
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* USER CODE END 6 */
+}
+#endif /* USE_FULL_ASSERT */

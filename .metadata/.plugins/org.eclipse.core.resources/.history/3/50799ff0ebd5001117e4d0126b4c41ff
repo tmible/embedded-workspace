@@ -1,0 +1,40 @@
+#include "roger.h"
+
+static USART_TypeDef* instance;
+static UART_HandleTypeDef* huart;
+static UartCallback_t callback;
+
+static uint8_t rx_buffer[1];
+static CircularBuffer* message;
+
+static const char answer[] = "roger\r\n";
+
+void Roger_Init(USART_TypeDef* instanceInit, UART_HandleTypeDef* huartInit, size_t bufferSize, UartCallback_t callbackInit) {
+	instance = instanceInit;
+	huart = huartInit;
+	message = CircularBuffer_Create(bufferSize);
+	callback = callbackInit;
+	HAL_UARTEx_ReceiveToIdle_DMA(huart, rx_buffer, sizeof(rx_buffer));
+}
+
+uint8_t Roger_GetNextChar(void) {
+	return CircularBuffer_Pop(message);
+}
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef* huart, uint16_t Size) {
+    if (huart->Instance != instance || Size == 0) {
+    	return;
+    }
+
+    if (rx_buffer[0] != '\4') {
+    	CircularBuffer_Push(message, rx_buffer[0]);
+		HAL_UARTEx_ReceiveToIdle_DMA(huart, rx_buffer, sizeof(rx_buffer));
+		return;
+	}
+
+    callback(CircularBuffer_GetSize(message));
+
+	HAL_UART_Transmit_DMA(huart, (uint8_t*)answer, sizeof(answer));
+
+	HAL_UARTEx_ReceiveToIdle_DMA(huart, rx_buffer, sizeof(rx_buffer));
+}

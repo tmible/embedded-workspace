@@ -1,0 +1,13 @@
+struct CircularBuffer {
+	uint8_t buffer[];
+	size_t start;
+	size_t current;
+};
+
+CircularBuffer* CircularBuffer_create(size_t size) {
+
+}
+
+void CircularBuffer_push(CircularBuffer* buffer, uint8_t byte);
+
+uint8_t CircularBuffer_pop(CircularBuffer* buffer);

@@ -1,0 +1,7 @@
+#include "roger.h"
+
+typedef struct CircularBuffer {
+	uint8_t buffer[225];
+	size_t start;
+	size_t current;
+} CircularBuffer;

@@ -1,0 +1,29 @@
+struct CircularBuffer {
+	uint8_t* buffer;
+	size_t size;
+	size_t start;
+	size_t current;
+};
+
+CircularBuffer* CircularBuffer_Create(size_t size) {
+	CircularBuffer buffer = { .size = size, .start = 0, .current = 0 };
+	buffer.buffer = malloc(size * sizeof(uint8_t));
+	return &buffer;
+}
+
+void CircularBuffer_Push(CircularBuffer* buffer, uint8_t byte) {
+	buffer->buffer[buffer->current] = byte;
+
+	buffer->current = buffer->current == buffer->size - 1 ? 0 : buffer->current + 1;
+	buffer->start += buffer->current == buffer->start ? 1 : 0;
+}
+
+uint8_t CircularBuffer_Pop(CircularBuffer* buffer) {
+	if (buffer->current == buffer->start) {
+		return 0;
+	}
+
+	buffer->current = buffer->current == 0 ? buffer->size - 1 : buffer->current - 1;
+
+	return buffer->buffer[buffer->current];
+}

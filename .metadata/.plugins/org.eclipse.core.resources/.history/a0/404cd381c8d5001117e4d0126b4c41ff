@@ -1,0 +1,54 @@
+#include "roger.h"
+
+static UART_HandleTypeDef* huart;
+static UartCallback_t callback;
+
+static uint8_t rx_buffer[1];
+static CircularBuffer message;
+
+static const char answer[] = "roger\r\n";
+
+void Roger_Init(UART_HandleTypeDef* huartInit, size_t bufferSize, UartCallback_t callbackInit) {
+	huart = huartInit;
+	message = CircularBuffer_create(bufferSize);
+	HAL_UARTEx_ReceiveToIdle_DMA(huart, rx_buffer, sizeof(rx_buffer));
+}
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef* huart, uint16_t Size) {
+    if (huart->Instance != USART1 || Size == 0) {
+    	return;
+    }
+
+    if (rx_buffer[0] != '\4') {
+		message.buffer[message.current] = rx_buffer[0];
+
+		message.current = message.current == sizeof(message.buffer) - 1 ? 0 : message.current + 1;
+		message.start += message.current == message.start ? 1 : 0;
+
+		HAL_UARTEx_ReceiveToIdle_DMA(huart, rx_buffer, sizeof(rx_buffer));
+		return;
+	}
+
+    APP_OnUartPacketReady(message.current > message.start ?  message.current - message.start );
+
+	for (size_t i = 0; i < sizeof(screen_buffer); ++i) {
+		screen_buffer[i] = 0x00;
+	}
+
+	for (
+		size_t i = message.start;
+		i != message.current;
+		i = i == sizeof(message.buffer) - 1 ? 0 : i + 1
+	) {
+		draw_char((i * 5) % SCREEN_WIDTH, (int)((i * 5) / SCREEN_WIDTH) * 7, message.buffer[i]);
+	}
+
+	SSD1315_UpdateScreen();
+
+	message.start = 0;
+	message.current = 0;
+
+	HAL_UART_Transmit_DMA(&huart1, (uint8_t*)answer, sizeof(answer));
+
+	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, rx_buffer, sizeof(rx_buffer));
+}

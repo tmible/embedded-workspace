@@ -1,0 +1,28 @@
+#ifndef INC_SSD1315_H_
+#define INC_SSD1315_H_
+
+#include <stdint.h>
+#include "stm32f4xx_hal.h"
+
+#define SSD1315_I2C_ADDR (0x3C << 1)
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define BITS_IN_BYTE 8
+#define BUFFER_SIZE SCREEN_WIDTH * SCREEN_HEIGHT / BITS_IN_BYTE
+
+#include "ssd1315.h"
+
+uint8_t screen_buffer[BUFFER_SIZE];
+
+void SSD1315_WriteCommand(I2C_HandleTypeDef hi2c, uint8_t cmd);
+
+void SSD1315_UpdateScreen(I2C_HandleTypeDef hi2c);
+
+void SSD1315_Init(I2C_HandleTypeDef hi2c);
+
+void SSD1315_DrawPixel(uint16_t x, uint16_t y, uint8_t color);
+
+void SSD1315_DrawChar(int x, int y, char c);
+
+#endif /* INC_SSD1315_H_ */

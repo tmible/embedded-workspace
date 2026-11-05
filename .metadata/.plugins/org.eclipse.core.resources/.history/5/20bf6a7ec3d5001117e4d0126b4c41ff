@@ -1,0 +1,10 @@
+#ifndef INC_CIRCULAR_BUFFER_H_
+#define INC_CIRCULAR_BUFFER_H_
+
+typedef struct CircularBuffer CircularBuffer;
+
+CircularBuffer* CircularBuffer_create(size_t size);
+void CircularBuffer_push(uint8_t c);
+uint8_t CircularBuffer_pop(void);
+
+#endif /* INC_CIRCULAR_BUFFER_H_ */

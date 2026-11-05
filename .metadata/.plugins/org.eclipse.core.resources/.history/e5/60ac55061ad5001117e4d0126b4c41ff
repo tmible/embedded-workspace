@@ -1,0 +1,8 @@
+#ifndef INC_ROGER_H_
+#define INC_ROGER_H_
+
+#include "stm32f4xx_hal.h"
+
+void Roger_Init(UART_HandleTypeDef* huart1);
+
+#endif /* INC_ROGER_H_ */
